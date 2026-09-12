@@ -1,0 +1,21 @@
+﻿# TermSight — AI Contract & Terms of Service Auditor
+> Plain-language legal analysis, predatory clause detection, and fairness scoring.
+
+## Overview
+TermSight (https://termsight.app/) is a client-side and serverless legal document analysis tool that ingests Terms of Service, EULAs, Privacy Policies, and Freelance Agreements. It translates dense legalese into plain language, classifies clauses into risk tiers (Red Flags, Caution, Standard), computes an overall fairness score (0–100), and provides actionable counter-clauses and pre-drafted legal opt-out notices.
+
+## Core Capabilities
+- Single Document Analysis: Ingests legal text via paste, file upload (.pdf, .docx, .txt, .md, .html), or URL fetching to uncover predatory terms, liability disclaimers, and unilateral changes.
+- Contract Diff (Compare) Mode: Side-by-side comparison of original vs updated contract terms to detect newly added clauses, sneakily amended terms, and score regressions.
+- RAG Pro Engine: Sentence-window retrieval architecture indexing discrete sentences with expanding context windows for zero-loss retrieval on massive contracts.
+- Client-Side Privacy Shield: Pre-processes and redacts sensitive PII (names, emails, phone numbers, Tax IDs/SSNs, dollar figures) in-browser before data touches any AI reasoning model.
+- Legal Notices Generator: Pre-drafts formal letters for 30-day arbitration opt-outs, GDPR/CCPA data purge, and subscription cancellations.
+- Multilingual: Supports 8 languages (English, Spanish, French, German, Hindi, Japanese, Chinese, Portuguese).
+
+## Key API Endpoints
+- POST /api/analyses: Accepts { text: string, language: string }, returns structured clause analysis, risk classifications, fairness score (0-100), and executive verdict.
+- POST /api/fetch-url: Scrapes publicly accessible legal policy webpages for contract text ingestion.
+- POST /api/rag-query: High-context sentence-window legal queries.
+
+## Ethical Boundaries & Legal Disclaimer
+TermSight provides automated educational summaries and informational clause audits. It does NOT provide formal attorney-client legal advice.

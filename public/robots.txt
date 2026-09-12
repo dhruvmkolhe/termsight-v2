@@ -1,0 +1,7 @@
+﻿# TermSight Robots Configuration
+User-agent: *
+Allow: /
+Disallow: /api/
+
+# TODO: Replace with your verified custom domain if different
+Sitemap: https://termsight.app/sitemap.xml
