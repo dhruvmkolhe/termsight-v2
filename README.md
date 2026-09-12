@@ -44,7 +44,7 @@ TermSight v2 is a major architectural evolution featuring zero context loss retr
 - **Frontend**: React 19, TypeScript 5, Vite 7, Tailwind CSS v4, Lucide React, Framer Motion
 - **Internationalization (i18n)**: Typed context dictionary with persistent language preference
 - **API & Serverless Layer**: Node.js serverless functions (`/api/analyses`, `/api/fetch-url`, `/api/rag-query`)
-- **AI & Reasoning Models**: Multi-provider fallback engine supporting NVIDIA NIM / Nemotron, OpenAI GPT-4o, Anthropic Claude 3.5, Google Gemini, and Groq Llama 3.3, paired with a deterministic client-side heuristic legal rule engine.
+- **AI & Reasoning Models**: Multi-provider fallback engine supporting NVIDIA NIM , Google Gemini, and Groq, paired with a deterministic client-side heuristic legal rule engine.
 - **Privacy & Sanitization**: Client-side regex PII mask engine.
 
 ---
