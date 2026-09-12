@@ -110,6 +110,5 @@ TermSight provides automated informational summaries and clause risk ratings usi
 
 ## 📬 Contact & Community
 
-- **Repository**: [https://github.com/dhruvmkolhe/termsight-v2](https://github.com/dhruvmkolhe/termsight-v2)
 - **Support & Inquiries**: [hellotermsight@proton.me](mailto:hellotermsight@proton.me)
 - **License**: [MIT](./LICENSE) © 2025-2026 TermSight Contributors
