@@ -1,0 +1,95 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+  background: #0a0a0a;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: #0a0a0a;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+textarea {
+  font: inherit;
+}
+
+::selection {
+  color: #0a0a0a;
+  background: #ffffff;
+}
+
+.contract-card {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 14px 45px rgba(0, 0, 0, 0.22);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.contract-card:hover {
+  transform: translateX(3px);
+  box-shadow: -6px 0 0 rgba(255, 255, 255, 0.08), 0 18px 55px rgba(0, 0, 0, 0.3);
+}
+
+textarea::-webkit-scrollbar {
+  width: 10px;
+}
+
+textarea::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+
+textarea::-webkit-scrollbar-thumb {
+  border: 3px solid #0a0a0a;
+  background: #444444;
+}
+
+/* Print Styles for Executive PDF Brief */
+@media print {
+  body {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+  }
+
+  header,
+  section#input-section,
+  .no-print,
+  button,
+  .print-hide {
+    display: none !important;
+  }
+
+  main {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+    overflow: visible !important;
+  }
+
+  .contract-card {
+    background: #FAFAFA !important;
+    border-color: #CCCCCC !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+    margin-bottom: 20px !important;
+    color: #000000 !important;
+  }
+
+  #results {
+    border-top: none !important;
+    padding-top: 0 !important;
+  }
+
+  h2, h3, p, span, div {
+    color: #000000 !important;
+  }
+}
