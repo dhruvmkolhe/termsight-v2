@@ -43,7 +43,7 @@ function getStagedDiff() {
   }
 }
 
-console.log('🔍 Running TermSight v2 Secret Scanner...');
+console.log('Running TermSight v2 Secret Scanner...');
 
 let violations = 0;
 const stagedFiles = getStagedFiles();
@@ -56,7 +56,7 @@ for (const file of stagedFiles) {
 
   for (const pattern of FORBIDDEN_FILES) {
     if (pattern.test(base)) {
-      console.error(`❌ BLOCKED: Secret file staged for commit: "${file}"`);
+      console.error(`[ERROR] BLOCKED: Secret file staged for commit: "${file}"`);
       violations++;
     }
   }
@@ -72,7 +72,7 @@ if (diff) {
 
     for (const { name, regex } of SECRET_PATTERNS) {
       if (regex.test(line)) {
-        console.error(`❌ BLOCKED: Potential ${name} detected in staged code:`);
+        console.error(`[ERROR] BLOCKED: Potential ${name} detected in staged code:`);
         console.error(`   ${line.trim().slice(0, 80)}...`);
         violations++;
       }
@@ -96,7 +96,7 @@ if (stagedFiles.length === 0) {
         const content = fs.readFileSync(relPath, 'utf8');
         for (const { name, regex } of SECRET_PATTERNS) {
           if (regex.test(content)) {
-            console.error(`❌ BLOCKED: Potential ${name} found in tracked file "${relPath}"`);
+            console.error(`[ERROR] BLOCKED: Potential ${name} found in tracked file "${relPath}"`);
             violations++;
           }
         }
@@ -108,9 +108,9 @@ if (stagedFiles.length === 0) {
 }
 
 if (violations > 0) {
-  console.error(`\n🚨 Scan failed with ${violations} security violation(s). Commit aborted.`);
+  console.error(`\n[FATAL] Scan failed with ${violations} security violation(s). Commit aborted.`);
   process.exit(1);
 } else {
-  console.log('✅ Secret scan clean: No secrets or credentials detected.');
+  console.log('[OK] Secret scan clean: No secrets or credentials detected.');
   process.exit(0);
 }
