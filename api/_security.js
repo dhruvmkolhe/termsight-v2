@@ -91,3 +91,106 @@ export function validatePayloadSize(req, maxBytes = 200 * 1024) {
 
   return { valid: true };
 }
+
+// In-memory sliding-window rate limit store
+export const _rateLimitStore = new Map();
+
+/**
+ * Extracts client IP from standard proxy headers or socket.
+ * @param {object} req
+ * @returns {string}
+ */
+export function getClientIp(req) {
+  const forwarded = req.headers?.['x-forwarded-for'];
+  if (typeof forwarded === 'string') {
+    const first = forwarded.split(',')[0].trim();
+    if (first) return first;
+  }
+  const realIp = req.headers?.['x-real-ip'];
+  if (typeof realIp === 'string' && realIp.trim()) {
+    return realIp.trim();
+  }
+  return req.socket?.remoteAddress || req.connection?.remoteAddress || '127.0.0.1';
+}
+
+/**
+ * Applies sliding-window rate limiting to the request.
+ *
+ * @param {object} req
+ * @param {object} res
+ * @param {object} [options={}]
+ * @param {string} [options.endpoint='api'] - Logical namespace for rate limit (e.g., 'analyses', 'fetch-url')
+ * @param {number} [options.maxRequests=20] - Maximum requests allowed within window
+ * @param {number} [options.windowMs=60000] - Window duration in milliseconds (default 60s)
+ * @returns {boolean} True if the request was blocked with 429 Too Many Requests, false otherwise.
+ */
+export function applyRateLimit(req, res, options = {}) {
+  const {
+    endpoint = 'api',
+    maxRequests = 20,
+    windowMs = 60 * 1000,
+  } = options;
+
+  const clientIp = getClientIp(req);
+  const storeKey = `${endpoint}:${clientIp}`;
+  const now = Date.now();
+
+  let timestamps = _rateLimitStore.get(storeKey) || [];
+  // Filter out timestamps outside the sliding window
+  timestamps = timestamps.filter((t) => t > now - windowMs);
+
+  if (timestamps.length >= maxRequests) {
+    const oldest = timestamps[0];
+    const resetInMs = Math.max(0, oldest + windowMs - now);
+    const retryAfterSec = Math.max(1, Math.ceil(resetInMs / 1000));
+
+    res.setHeader('X-RateLimit-Limit', String(maxRequests));
+    res.setHeader('X-RateLimit-Remaining', '0');
+    res.setHeader('X-RateLimit-Reset', String(Math.ceil((oldest + windowMs) / 1000)));
+    res.setHeader('Retry-After', String(retryAfterSec));
+
+    const payload = JSON.stringify({
+      error: `Too many requests. Rate limit is ${maxRequests} requests per minute. Try again in ${retryAfterSec} second${retryAfterSec === 1 ? '' : 's'}.`,
+    });
+
+    if (typeof res.status === 'function') {
+      res.status(429);
+      if (typeof res.setHeader === 'function') res.setHeader('Content-Type', 'application/json');
+      if (typeof res.json === 'function') {
+        res.json(JSON.parse(payload));
+      } else {
+        res.end(payload);
+      }
+    } else {
+      res.statusCode = 429;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(payload);
+    }
+
+    return true;
+  }
+
+  // Record this request
+  timestamps.push(now);
+  _rateLimitStore.set(storeKey, timestamps);
+
+  // Set standard RateLimit response headers
+  res.setHeader('X-RateLimit-Limit', String(maxRequests));
+  res.setHeader('X-RateLimit-Remaining', String(maxRequests - timestamps.length));
+  res.setHeader('X-RateLimit-Reset', String(Math.ceil((now + windowMs) / 1000)));
+
+  // Auto-prune stale keys if map exceeds 500 entries
+  if (_rateLimitStore.size > 500) {
+    for (const [key, list] of _rateLimitStore.entries()) {
+      const active = list.filter((t) => t > now - windowMs);
+      if (active.length === 0) {
+        _rateLimitStore.delete(key);
+      } else {
+        _rateLimitStore.set(key, active);
+      }
+    }
+  }
+
+  return false;
+}
+

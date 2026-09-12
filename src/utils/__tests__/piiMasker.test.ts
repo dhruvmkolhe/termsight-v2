@@ -1,7 +1,47 @@
 import { describe, expect, it } from 'vitest';
-import { maskSensitivePII } from '../piiMasker';
+import { isValidLuhn, maskSensitivePII } from '../piiMasker';
+
+describe('isValidLuhn', () => {
+  it('should validate genuine credit card checksums', () => {
+    expect(isValidLuhn('4532 0151 1283 0366')).toBe(true);
+    expect(isValidLuhn('5425-2334-3010-9903')).toBe(true);
+  });
+
+  it('should reject invalid card numbers', () => {
+    expect(isValidLuhn('4532015112830367')).toBe(false);
+    expect(isValidLuhn('1111222233334445')).toBe(false);
+    expect(isValidLuhn('12345')).toBe(false);
+  });
+});
 
 describe('maskSensitivePII (Privacy Shield)', () => {
+  it('should mask valid credit card numbers and ignore invalid sequences', () => {
+    const input = 'Client billed on card 4532 0151 1283 0366 with internal batch ID 1111222233334445.';
+    const result = maskSensitivePII(input);
+
+    expect(result.maskedText).toContain('[REDACTED_CREDIT_CARD]');
+    expect(result.maskedText).not.toContain('4532 0151 1283 0366');
+    expect(result.maskedText).toContain('1111222233334445'); // Failed Luhn check, preserved
+  });
+
+  it('should mask International Bank Account Numbers (IBAN)', () => {
+    const input = 'Wire transfer to GB82WEST12345698765432 or DE89 3704 0044 0532 0130 00.';
+    const result = maskSensitivePII(input);
+
+    expect(result.maskedText).toContain('[REDACTED_IBAN]');
+    expect(result.maskedText).not.toContain('GB82WEST12345698765432');
+    expect(result.count).toBe(2);
+  });
+
+  it('should mask cryptocurrency wallet addresses', () => {
+    const input = 'Settlement to ETH 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 or BTC 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa or bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq.';
+    const result = maskSensitivePII(input);
+
+    expect(result.maskedText).toContain('[REDACTED_CRYPTO_ADDRESS]');
+    expect(result.maskedText).not.toContain('0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045');
+    expect(result.count).toBe(3);
+  });
+
   it('should mask email addresses accurately', () => {
     const input = 'Contact john.doe@company.com or legal-ops@sub.domain.co.uk for inquiries.';
     const result = maskSensitivePII(input);

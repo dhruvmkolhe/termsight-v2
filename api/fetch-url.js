@@ -1,4 +1,5 @@
-import { applyCors, validatePayloadSize } from './_security.js';
+import { applyCors, validatePayloadSize, applyRateLimit } from './_security.js';
+import { safeFetch, validateSafeUrl } from './_ssrf.js';
 
 function cleanHtmlToText(html) {
   let text = html
@@ -38,6 +39,8 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  if (applyRateLimit(req, res, { endpoint: 'fetch-url', maxRequests: 20, windowMs: 60000 })) return;
+
   const payloadCheck = validatePayloadSize(req, 10 * 1024);
   if (!payloadCheck.valid) {
     return res.status(413).json({ error: payloadCheck.error });
@@ -52,28 +55,16 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'URL exceeds maximum length of 2,048 characters.' });
   }
 
-  let parsedUrl;
-  try {
-    parsedUrl = new URL(url.trim());
-    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-      return res.status(400).json({ error: 'Only HTTP and HTTPS URLs are supported.' });
-    }
-  } catch {
-    return res.status(400).json({ error: 'Invalid URL format. Include http:// or https://' });
+  // Validate URL against SSRF and private address ranges
+  const ssrfCheck = await validateSafeUrl(url);
+  if (!ssrfCheck.safe) {
+    return res.status(400).json({ error: ssrfCheck.error });
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 9000);
-
   try {
-    const response = await fetch(parsedUrl.toString(), {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 TermSight-Scraper/1.0',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      },
-      signal: controller.signal,
+    const response = await safeFetch(ssrfCheck.parsedUrl.toString(), {
+      timeoutMs: 8000,
     });
-    clearTimeout(timeoutId);
 
     if (!response.ok) {
       return res.status(400).json({
@@ -104,12 +95,11 @@ export default async function handler(req, res) {
       title,
       text: trimmedText,
       characterCount: trimmedText.length,
-      url: parsedUrl.toString(),
+      url: ssrfCheck.parsedUrl.toString(),
     });
   } catch (err) {
-    clearTimeout(timeoutId);
-    if (err.name === 'AbortError') {
-      return res.status(408).json({ error: 'Webpage fetch timed out after 9 seconds. Please copy and paste the text manually.' });
+    if (err.name === 'AbortError' || err.message.includes('timed out')) {
+      return res.status(408).json({ error: 'Webpage fetch timed out after 8 seconds. Please copy and paste the text manually.' });
     }
     return res.status(500).json({ error: `Failed to fetch URL: ${err.message}` });
   }
