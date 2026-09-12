@@ -194,3 +194,51 @@ export function applyRateLimit(req, res, options = {}) {
   return false;
 }
 
+/**
+ * Verifies a Cloudflare Turnstile token against Cloudflare's siteverify API.
+ * If TURNSTILE_SECRET_KEY is not configured in process.env, it safely bypasses verification.
+ *
+ * @param {string} token
+ * @param {string} [clientIp]
+ * @returns {Promise<{ verified: boolean, error?: string }>}
+ */
+export async function verifyTurnstileToken(token, clientIp) {
+  const secretKey = process.env.TURNSTILE_SECRET_KEY;
+  if (!secretKey) {
+    // If not configured, bypass gracefully for local development & standard deployment
+    return { verified: true };
+  }
+
+  if (!token || typeof token !== 'string') {
+    return { verified: false, error: 'Anti-bot verification token is required.' };
+  }
+
+  try {
+    const formData = new URLSearchParams();
+    formData.append('secret', secretKey);
+    formData.append('response', token.trim());
+    if (clientIp) formData.append('remoteip', clientIp);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+    const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    const outcome = await res.json();
+    if (outcome.success) {
+      return { verified: true };
+    }
+    return { verified: false, error: 'Bot verification challenge failed. Please retry.' };
+  } catch (err) {
+    console.warn('Turnstile verification error:', err.message);
+    // In case of Cloudflare network timeout or outage, fallback safely
+    return { verified: true };
+  }
+}
+
+

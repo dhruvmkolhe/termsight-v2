@@ -58,7 +58,7 @@ INSTRUCTIONS:
 CRITICAL: Return ONLY raw JSON array starting with '[' and ending with ']'. No markdown fences, no conversational preamble.`;
 }
 
-import { applyCors, validatePayloadSize, applyRateLimit } from './_security.js';
+import { applyCors, validatePayloadSize, applyRateLimit, verifyTurnstileToken, getClientIp } from './_security.js';
 
 export const SYSTEM_PROMPT = getSystemPrompt('en');
 
@@ -536,6 +536,13 @@ export default async function handler(req, res) {
 
       if (!req.body || typeof req.body !== 'object') {
         return res.status(400).json({ error: 'Invalid request body. Expected JSON object.' });
+      }
+
+      // Optional Turnstile bot verification (active when TURNSTILE_SECRET_KEY is set)
+      const turnstileToken = req.body.turnstileToken || req.headers?.['x-turnstile-token'];
+      const botCheck = await verifyTurnstileToken(turnstileToken, getClientIp(req));
+      if (!botCheck.verified) {
+        return res.status(403).json({ error: botCheck.error });
       }
 
       const text = typeof req.body.text === 'string' ? req.body.text.trim() : '';

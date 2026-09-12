@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   _rateLimitStore,
   applyCors,
@@ -6,6 +6,7 @@ import {
   getClientIp,
   isAllowedOrigin,
   validatePayloadSize,
+  verifyTurnstileToken,
 } from '../../../api/_security.js';
 
 describe('API Security Middleware (_security.js)', () => {
@@ -217,6 +218,27 @@ describe('API Security Middleware (_security.js)', () => {
       expect(res3.headers['Retry-After']).toBeDefined();
       expect(res3.headers['X-RateLimit-Remaining']).toBe('0');
       expect(res3.jsonBody).toHaveProperty('error');
+    });
+  });
+
+  describe('verifyTurnstileToken', () => {
+    const originalEnv = process.env.TURNSTILE_SECRET_KEY;
+
+    afterEach(() => {
+      process.env.TURNSTILE_SECRET_KEY = originalEnv;
+    });
+
+    it('should safely bypass verification if TURNSTILE_SECRET_KEY is not configured', async () => {
+      delete process.env.TURNSTILE_SECRET_KEY;
+      const result = await verifyTurnstileToken('', '127.0.0.1');
+      expect(result.verified).toBe(true);
+    });
+
+    it('should reject requests without a token when TURNSTILE_SECRET_KEY is active', async () => {
+      process.env.TURNSTILE_SECRET_KEY = 'mock_secret_key';
+      const result = await verifyTurnstileToken('', '127.0.0.1');
+      expect(result.verified).toBe(false);
+      expect(result.error).toContain('verification token is required');
     });
   });
 });
