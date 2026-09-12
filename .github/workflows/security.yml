@@ -11,10 +11,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  security-and-quality:
-    name: Security Scan & Test Suite
+  # Check 1: Automated Secret Scanner
+  secret-scan:
+    name: 🛡️ Secret & Credential Leak Scan
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
@@ -30,14 +30,82 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: 🛡️ Pre-Commit Secret Scanner
+      - name: Scan Staged & Tracked Files for Secrets
         run: npm run check:secrets
 
-      - name: 🔍 ESLint Static Code Analysis
+  # Check 2: ESLint Code Quality
+  lint:
+    name: 🔍 ESLint Static Code Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run ESLint Linter
         run: npm run lint
 
-      - name: 🧪 Vitest Test Suite (Unit & Security Tests)
+  # Check 3: Vitest Unit & Security Tests
+  unit-tests:
+    name: 🧪 Vitest Unit & Security Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Execute Vitest Suite
         run: npm test
 
-      - name: 📦 Production Build & TypeScript Verification
+  # Check 4: NPM Dependency Security Audit
+  dependency-audit:
+    name: 🔒 NPM Dependency Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Audit Dependencies for Known CVEs
+        run: npm audit --audit-level=high
+
+  # Check 5: Production Build & TypeScript Verification
+  production-build:
+    name: 📦 Production Bundle & TypeScript Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Production Assets
         run: npm run build
