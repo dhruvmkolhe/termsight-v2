@@ -53,13 +53,9 @@ INSTRUCTIONS:
 CRITICAL: Return ONLY raw JSON array starting with '[' and ending with ']'. No markdown fences, no conversational preamble.`;
 }
 
-export const SYSTEM_PROMPT = getSystemPrompt('en');
+import { applyCors, validatePayloadSize } from './_security.js';
 
-function cors(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-}
+export const SYSTEM_PROMPT = getSystemPrompt('en');
 
 function cleanAndParse(raw) {
   if (typeof raw !== 'string') throw new Error('The AI returned an empty response.');
@@ -512,8 +508,7 @@ function getDocumentTitle(text) {
 }
 
 export default async function handler(req, res) {
-  cors(res);
-  if (req.method === 'OPTIONS') return res.status(204).end();
+  if (applyCors(req, res)) return;
 
   try {
     if (req.method === 'GET') {
@@ -521,8 +516,19 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
-      const language = typeof req.body?.language === 'string' ? req.body.language.trim() : 'en';
+      const payloadCheck = validatePayloadSize(req, 250 * 1024);
+      if (!payloadCheck.valid) {
+        return res.status(413).json({ error: payloadCheck.error });
+      }
+
+      if (!req.body || typeof req.body !== 'object') {
+        return res.status(400).json({ error: 'Invalid request body. Expected JSON object.' });
+      }
+
+      const text = typeof req.body.text === 'string' ? req.body.text.trim() : '';
+      const rawLanguage = typeof req.body.language === 'string' ? req.body.language.trim().toLowerCase() : 'en';
+      const language = LANGUAGE_NAMES[rawLanguage] ? rawLanguage : 'en';
+
       if (!text) return res.status(400).json({ error: 'Paste a contract first. We need something to read.' });
       if (text.length < 120) return res.status(400).json({ error: 'Paste at least 120 characters of the agreement.' });
       if (text.length > 60000) return res.status(400).json({ error: 'The document must be under 60,000 characters.' });

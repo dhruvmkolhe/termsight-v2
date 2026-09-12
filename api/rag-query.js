@@ -25,11 +25,7 @@ Return ONLY a valid raw JSON object (no markdown code fences, no extra text) wit
   "actionableAdvice": "string (practical advice for negotiation or protection)"
 }`;
 
-function cors(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-}
+import { applyCors, validatePayloadSize } from './_security.js';
 
 function cleanAndParse(raw) {
   if (typeof raw !== 'string') throw new Error('Empty AI response');
@@ -172,30 +168,54 @@ async function callGroq(prompt, userContent) {
 }
 
 export default async function handler(req, res) {
-  cors(res);
-  if (req.method === 'OPTIONS') return res.status(204).end();
+  if (applyCors(req, res)) return;
 
   try {
     if (req.method !== 'POST') {
       return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { query, windows, documentTitle, language = 'en' } = req.body || {};
-    if (!query || typeof query !== 'string') {
+    const payloadCheck = validatePayloadSize(req, 150 * 1024);
+    if (!payloadCheck.valid) {
+      return res.status(413).json({ error: payloadCheck.error });
+    }
+
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ error: 'Invalid request body. Expected JSON object.' });
+    }
+
+    const { query, windows, documentTitle, language = 'en' } = req.body;
+    if (!query || typeof query !== 'string' || !query.trim()) {
       return res.status(400).json({ error: 'Query parameter is required' });
     }
+    if (query.trim().length > 1000) {
+      return res.status(400).json({ error: 'Query exceeds maximum length of 1,000 characters.' });
+    }
+
     if (!Array.isArray(windows) || windows.length === 0) {
       return res.status(400).json({ error: 'No sentence windows provided' });
     }
 
+    // Cap windows array and sanitize each window
+    const safeWindows = windows.slice(0, 20).filter((w) => w && typeof w === 'object');
+    if (safeWindows.length === 0) {
+      return res.status(400).json({ error: 'Invalid sentence windows structure' });
+    }
+
     // Format retrieved windows for AI context
-    const formattedWindows = windows.map((w, i) => {
+    const formattedWindows = safeWindows.map((w, i) => {
+      const section = typeof w.sectionTitle === 'string' ? w.sectionTitle.slice(0, 100) : 'General';
+      const line = typeof w.lineNumber === 'number' || typeof w.lineNumber === 'string' ? w.lineNumber : 'N/A';
+      const focal = typeof w.focalSentence === 'string' ? w.focalSentence.slice(0, 1500) : '';
+      const winText = typeof w.windowText === 'string' ? w.windowText.slice(0, 3000) : '';
+      const domain = typeof w.domainCategory === 'string' ? w.domainCategory.slice(0, 50) : 'general';
+
       return `[WINDOW #${i + 1}]
-Section: ${w.sectionTitle || 'General'}
-Line Number: ${w.lineNumber || 'N/A'}
-Focal Sentence: "${w.focalSentence}"
-Surrounding Context Window: "${w.windowText}"
-Domain: ${w.domainCategory || 'general'}`;
+Section: ${section}
+Line Number: ${line}
+Focal Sentence: "${focal}"
+Surrounding Context Window: "${winText}"
+Domain: ${domain}`;
     }).join('\n\n');
 
     const userMessage = `DOCUMENT: ${documentTitle || 'Legal Agreement'}

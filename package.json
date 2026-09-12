@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "check:secrets": "node scripts/check-secrets.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.1",

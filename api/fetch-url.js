@@ -1,8 +1,4 @@
-function cors(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-}
+import { applyCors, validatePayloadSize } from './_security.js';
 
 function cleanHtmlToText(html) {
   let text = html
@@ -36,16 +32,24 @@ function cleanHtmlToText(html) {
 }
 
 export default async function handler(req, res) {
-  cors(res);
-  if (req.method === 'OPTIONS') return res.status(204).end();
+  if (applyCors(req, res)) return;
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const payloadCheck = validatePayloadSize(req, 10 * 1024);
+  if (!payloadCheck.valid) {
+    return res.status(413).json({ error: payloadCheck.error });
+  }
+
   const { url } = req.body || {};
-  if (!url || typeof url !== 'string') {
+  if (!url || typeof url !== 'string' || !url.trim()) {
     return res.status(400).json({ error: 'Please provide a valid URL to analyze.' });
+  }
+
+  if (url.trim().length > 2048) {
+    return res.status(400).json({ error: 'URL exceeds maximum length of 2,048 characters.' });
   }
 
   let parsedUrl;
@@ -77,7 +81,15 @@ export default async function handler(req, res) {
       });
     }
 
-    const html = await response.text();
+    const contentLength = response.headers.get('content-length');
+    if (contentLength && parseInt(contentLength, 10) > 2 * 1024 * 1024) {
+      return res.status(413).json({
+        error: 'The target webpage is too large (> 2 MB). Please copy and paste the legal text directly.',
+      });
+    }
+
+    const rawHtml = await response.text();
+    const html = rawHtml.slice(0, 2000000); // Guard against memory spikes
     const { title, text } = cleanHtmlToText(html);
 
     if (!text || text.length < 100) {
