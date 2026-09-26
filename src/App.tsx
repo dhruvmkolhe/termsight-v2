@@ -30,6 +30,7 @@ import { initAnalytics, trackCta, trackPageView } from './utils/analytics';
 import { computeFairnessScore } from './utils/scoring';
 import type { Analysis, Clause, SampleContract } from './types/contract';
 import { safeFetchJson } from './utils/fetchHelper';
+import { runClientSideAnalysis } from './utils/fallbackAnalyzer';
 
 const RagProDashboard = lazy(() =>
   import('./components/RagProDashboard').then((m) => ({ default: m.RagProDashboard }))
@@ -318,8 +319,13 @@ export function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: textToSend, language }),
       });
-      if (!res.ok || !res.data) throw new Error(res.error || 'The analysis failed. Please try again.');
-      const data = res.data;
+      let data: Analysis;
+      if (res.ok && res.data) {
+        data = res.data;
+      } else {
+        // Fallback to client-side heuristic engine if API is unavailable (e.g. 405 on static hosting)
+        data = runClientSideAnalysis(textToSend);
+      }
 
       
       // Preserve original text for deadline extraction
@@ -363,10 +369,10 @@ export function App() {
         }),
       ]);
 
-      if (!resA.ok || !resA.data) throw new Error(resA.error || 'Comparison for Version 1 failed.');
-      if (!resB.ok || !resB.data) throw new Error(resB.error || 'Comparison for Version 2 failed.');
-      setDiffAnalysisA(resA.data);
-      setDiffAnalysisB(resB.data);
+      const dataA = (resA.ok && resA.data) ? resA.data : runClientSideAnalysis(docAToSend);
+      const dataB = (resB.ok && resB.data) ? resB.data : runClientSideAnalysis(docBToSend);
+      setDiffAnalysisA(dataA);
+      setDiffAnalysisB(dataB);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Comparison failed. Try again.');
     } finally {
