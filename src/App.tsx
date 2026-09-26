@@ -29,6 +29,7 @@ import { useLanguage } from './context/LanguageContext';
 import { initAnalytics, trackCta, trackPageView } from './utils/analytics';
 import { computeFairnessScore } from './utils/scoring';
 import type { Analysis, Clause, SampleContract } from './types/contract';
+import { safeFetchJson } from './utils/fetchHelper';
 
 const RagProDashboard = lazy(() =>
   import('./components/RagProDashboard').then((m) => ({ default: m.RagProDashboard }))
@@ -189,16 +190,16 @@ export function App() {
     trackCta('fetch_url_started', { url: target });
 
     try {
-      const res = await fetch('/api/fetch-url', {
+      const res = await safeFetchJson<{ text: string; title?: string }>('/api/fetch-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: target.trim() }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to fetch webpage.');
-      setText(data.text);
-      setUploadedFileName(`Scraped: ${data.title || target}`);
+      if (!res.ok || !res.data) throw new Error(res.error || 'Failed to fetch webpage.');
+      setText(res.data.text);
+      setUploadedFileName(`Scraped: ${res.data.title || target}`);
       setActiveTab('paste');
+
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Could not fetch this webpage.');
     } finally {
@@ -312,13 +313,14 @@ export function App() {
     const textToSend = privacyMode ? maskSensitivePII(text).maskedText : text.trim();
 
     try {
-      const response = await fetch('/api/analyses', {
+      const res = await safeFetchJson<Analysis>('/api/analyses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: textToSend, language }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'The analysis failed. Please try again.');
+      if (!res.ok || !res.data) throw new Error(res.error || 'The analysis failed. Please try again.');
+      const data = res.data;
+
       
       // Preserve original text for deadline extraction
       data.source_text = text.trim();
@@ -349,22 +351,22 @@ export function App() {
 
     try {
       const [resA, resB] = await Promise.all([
-        fetch('/api/analyses', {
+        safeFetchJson<Analysis>('/api/analyses', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: docAToSend, language }),
         }),
-        fetch('/api/analyses', {
+        safeFetchJson<Analysis>('/api/analyses', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: docBToSend, language }),
         }),
       ]);
 
-      const dataA = await resA.json();
-      const dataB = await resB.json();
-      setDiffAnalysisA(dataA);
-      setDiffAnalysisB(dataB);
+      if (!resA.ok || !resA.data) throw new Error(resA.error || 'Comparison for Version 1 failed.');
+      if (!resB.ok || !resB.data) throw new Error(resB.error || 'Comparison for Version 2 failed.');
+      setDiffAnalysisA(resA.data);
+      setDiffAnalysisB(resB.data);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Comparison failed. Try again.');
     } finally {

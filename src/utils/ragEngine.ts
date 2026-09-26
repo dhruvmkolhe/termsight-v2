@@ -1,4 +1,5 @@
 import type { LegalDomain, RagIndex, RagQueryResult, RagRetrievedWindow, SentenceWindow } from '../types/rag';
+import { safeFetchJson } from './fetchHelper';
 
 const LEGAL_ABBREVIATIONS = [
   'e.g.', 'i.e.', 'vs.', 'v.', 'inc.', 'llc.', 'ltd.', 'corp.', 'no.', 'sec.', 'art.',
@@ -643,7 +644,7 @@ export async function executeRagQuery(
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 12000);
 
-    const response = await fetch('/api/rag-query', {
+    const res = await safeFetchJson('/api/rag-query', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
@@ -657,11 +658,11 @@ export async function executeRagQuery(
 
     clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      throw new Error(`Server AI response ${response.status}`);
+    if (!res.ok || !res.data) {
+      throw new Error(res.error || `Server AI response ${res.status}`);
     }
 
-    const data = await response.json();
+    const data = res.data;
     const executionTimeMs = Math.round(performance.now() - startTime);
 
     return {

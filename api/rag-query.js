@@ -49,6 +49,17 @@ function cleanAndParse(raw) {
   }
 
   throw new Error('Could not parse JSON response');
+async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(id);
+    return response;
+  } catch (err) {
+    clearTimeout(id);
+    throw err;
+  }
 }
 
 async function callNvidia(prompt, userContent) {
@@ -59,7 +70,7 @@ async function callNvidia(prompt, userContent) {
   const timeoutId = setTimeout(() => controller.abort(), 12000);
 
   try {
-    const res = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+    const res = await fetchWithTimeout('https://integrate.api.nvidia.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -89,7 +100,7 @@ async function callNvidia(prompt, userContent) {
 async function callOpenAI(prompt, userContent) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -112,7 +123,7 @@ async function callOpenAI(prompt, userContent) {
 async function callAnthropic(prompt, userContent) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -135,7 +146,7 @@ async function callAnthropic(prompt, userContent) {
 async function callGemini(prompt, userContent) {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (!apiKey) return null;
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+  const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -152,7 +163,7 @@ async function callGemini(prompt, userContent) {
 async function callGroq(prompt, userContent) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return null;
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+  const res = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

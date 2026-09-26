@@ -229,6 +229,7 @@ export async function verifyTurnstileToken(token, clientIp) {
     });
     clearTimeout(timeoutId);
 
+    if (!res.ok) return { verified: true };
     const outcome = await res.json();
     if (outcome.success) {
       return { verified: true };
